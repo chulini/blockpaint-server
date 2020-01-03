@@ -14,7 +14,7 @@ for (let i = 0; i < 7; i++) {
     }
 }
 
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocket.Server({ port: 5000 });
 let wsc = new WebSocket('wss://ws.blockchain.info/inv');
 let wssConnected = null;
 

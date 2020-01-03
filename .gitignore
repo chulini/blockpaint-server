@@ -4,5 +4,6 @@ db.json
 *.log
 node_modules/
 aws.sh
+*.pem
 # public/
 # .deploy*/
