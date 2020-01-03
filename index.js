@@ -1,5 +1,5 @@
 const WebSocket = require('ws');
-const gridResolution = 7;
+const gridResolution = 13;
 let miningBlockHeight = -1;
 let blocksColors = []
 // i = 0 ==> block being mined
@@ -26,6 +26,30 @@ wsc.on('open', function open() {
 
     }, 15000);
 
+
+    wss.on('connection', function connection(ws) {
+        wssConnected = ws;
+        ws.send('allcolors|' + JSON.stringify(blocksColors)+'|'+miningBlockHeight);
+
+        ws.on('message', function incoming(data) {
+            let msgSplit = data.split('|');
+            if (msgSplit[0] === 'colorchange') {
+                const x = parseInt(msgSplit[1]);
+                const y = parseInt(msgSplit[2]);
+                const newColor = parseInt(msgSplit[3]);
+                blocksColors[0][x][y] = newColor;
+
+                wss.clients.forEach(function each(client) {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(`colorchange|${x}|${y}|${blocksColors[0][x][y]}`);
+                    }
+                });
+            }
+
+
+        });
+    });
+
     // setInterval(() => {
     //     miningBlockHeight++;
     //     NewBlock();
@@ -43,7 +67,7 @@ wsc.on('message', function incoming(data) {
 
 
 function NewBlock() {
-    
+
     console.log(`mining new block ${miningBlockHeight}`);
     //Shift colors
     blocksColors.pop();
@@ -57,34 +81,11 @@ function NewBlock() {
     blocksColors.unshift(newBlockColor);
 
     if (wssConnected != null) {
-        wssConnected.send('allcolors|' + JSON.stringify(blocksColors));
+        wssConnected.send('allcolors|' + JSON.stringify(blocksColors) + '|' + miningBlockHeight);
     }
 }
 
 
-
-wss.on('connection', function connection(ws) {
-    wssConnected = ws;
-    ws.send('allcolors|' + JSON.stringify(blocksColors));
-
-    ws.on('message', function incoming(data) {
-        let msgSplit = data.split('|');
-        if (msgSplit[0] === 'colorchange') {
-            const x = parseInt(msgSplit[1]);
-            const y = parseInt(msgSplit[2]);
-            const newColor = parseInt(msgSplit[3]);
-            blocksColors[0][x][y] = newColor;
-
-            wss.clients.forEach(function each(client) {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(`colorchange|${x}|${y}|${blocksColors[0][x][y]}`);
-                }
-            });
-        }
-
-
-    });
-});
 
 // wss.on('connection', function connection(ws) {
 //     ws.on('message', function incoming(message) {
