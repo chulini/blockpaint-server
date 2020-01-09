@@ -1,4 +1,63 @@
 const WebSocket = require('ws');
+
+function WebSocketClient(){
+	this.number = 0;	// Message number
+	this.autoReconnectInterval = 5*1000;	// ms
+}
+WebSocketClient.prototype.open = function(url){
+	this.url = url;
+	this.instance = new WebSocket(this.url);
+	this.instance.on('open',()=>{
+		this.onopen();
+	});
+	this.instance.on('message',(data,flags)=>{
+		this.number ++;
+		this.onmessage(data,flags,this.number);
+	});
+	this.instance.on('close',(e)=>{
+		switch (e.code){
+		case 1000:	// CLOSE_NORMAL
+			console.log("WebSocket: closed");
+			break;
+		default:	// Abnormal closure
+			this.reconnect(e);
+			break;
+		}
+		this.onclose(e);
+	});
+	this.instance.on('error',(e)=>{
+		switch (e.code){
+		case 'ECONNREFUSED':
+			this.reconnect(e);
+			break;
+		default:
+			this.onerror(e);
+			break;
+		}
+	});
+}
+WebSocketClient.prototype.send = function(data,option){
+	try{
+		this.instance.send(data,option);
+	}catch (e){
+		this.instance.emit('error',e);
+	}
+}
+WebSocketClient.prototype.reconnect = function(e){
+	console.log(`WebSocketClient: retry in ${this.autoReconnectInterval}ms`,e);
+        this.instance.removeAllListeners();
+	var that = this;
+	setTimeout(function(){
+		console.log("WebSocketClient: reconnecting...");
+		that.open(that.url);
+	},this.autoReconnectInterval);
+}
+WebSocketClient.prototype.onopen = function(e){	console.log("WebSocketClient: open",arguments);	}
+WebSocketClient.prototype.onmessage = function(data,flags,number){	console.log("WebSocketClient: message",arguments);	}
+WebSocketClient.prototype.onerror = function(e){	console.log("WebSocketClient: error",arguments);	}
+WebSocketClient.prototype.onclose = function(e){	console.log("WebSocketClient: closed",arguments);	}
+
+
 const gridResolution = 21;
 let miningBlockHeight = -1;
 let blocksColors = []
@@ -17,9 +76,11 @@ for (let i = 0; i < 7; i++) {
 }
 
 const wss = new WebSocket.Server({ port: 5000 });
-let wsBlockTick = new WebSocket('wss://ws.blockchain.info/inv');
+let wsBlockTick = new WebSocketClient();//new WebSocket('wss://ws.blockchain.info/inv');
+wsBlockTick.open('wss://ws.blockchain.info/inv');
 
-wsBlockTick.on('open', function open() {
+wsBlockTick.onopen = function(e){
+    console.log("Block tick websocket connected");
     wsBlockTick.send(JSON.stringify({ op: "blocks_sub" }));
     wsBlockTick.send(JSON.stringify({ op: "ping_block" }));
     setInterval(() => {
@@ -43,7 +104,7 @@ wsBlockTick.on('open', function open() {
             }
         });
     });
-});
+}
 
 // To simulate new blocks
 // NewBlock(miningBlockHeight+1);
@@ -52,10 +113,10 @@ wsBlockTick.on('open', function open() {
 //     NewBlock(miningBlockHeight+1);
 // }, 10000);
 
-wsBlockTick.on('message', function incoming(data) {
+wsBlockTick.onmessage = function(data,flags,number){
     let blockData = JSON.parse(data);
     NewBlock(blockData.x.height);
-});
+}
 
 
 function NewBlock(height) {
